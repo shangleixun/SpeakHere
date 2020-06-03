@@ -1,67 +1,67 @@
 /*
  
-    File: AQPlayer.mm
-Abstract: n/a
+ File: AQPlayer.mm
+ Abstract: n/a
  Version: 2.5
-
-Disclaimer: IMPORTANT:  This Apple software is supplied to you by Apple
-Inc. ("Apple") in consideration of your agreement to the following
-terms, and your use, installation, modification or redistribution of
-this Apple software constitutes acceptance of these terms.  If you do
-not agree with these terms, please do not use, install, modify or
-redistribute this Apple software.
-
-In consideration of your agreement to abide by the following terms, and
-subject to these terms, Apple grants you a personal, non-exclusive
-license, under Apple's copyrights in this original Apple software (the
-"Apple Software"), to use, reproduce, modify and redistribute the Apple
-Software, with or without modifications, in source and/or binary forms;
-provided that if you redistribute the Apple Software in its entirety and
-without modifications, you must retain this notice and the following
-text and disclaimers in all such redistributions of the Apple Software.
-Neither the name, trademarks, service marks or logos of Apple Inc. may
-be used to endorse or promote products derived from the Apple Software
-without specific prior written permission from Apple.  Except as
-expressly stated in this notice, no other rights or licenses, express or
-implied, are granted by Apple herein, including but not limited to any
-patent rights that may be infringed by your derivative works or by other
-works in which the Apple Software may be incorporated.
-
-The Apple Software is provided by Apple on an "AS IS" basis.  APPLE
-MAKES NO WARRANTIES, EXPRESS OR IMPLIED, INCLUDING WITHOUT LIMITATION
-THE IMPLIED WARRANTIES OF NON-INFRINGEMENT, MERCHANTABILITY AND FITNESS
-FOR A PARTICULAR PURPOSE, REGARDING THE APPLE SOFTWARE OR ITS USE AND
-OPERATION ALONE OR IN COMBINATION WITH YOUR PRODUCTS.
-
-IN NO EVENT SHALL APPLE BE LIABLE FOR ANY SPECIAL, INDIRECT, INCIDENTAL
-OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
-SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
-INTERRUPTION) ARISING IN ANY WAY OUT OF THE USE, REPRODUCTION,
-MODIFICATION AND/OR DISTRIBUTION OF THE APPLE SOFTWARE, HOWEVER CAUSED
-AND WHETHER UNDER THEORY OF CONTRACT, TORT (INCLUDING NEGLIGENCE),
-STRICT LIABILITY OR OTHERWISE, EVEN IF APPLE HAS BEEN ADVISED OF THE
-POSSIBILITY OF SUCH DAMAGE.
-
-Copyright (C) 2012 Apple Inc. All Rights Reserved.
-
  
-*/
+ Disclaimer: IMPORTANT:  This Apple software is supplied to you by Apple
+ Inc. ("Apple") in consideration of your agreement to the following
+ terms, and your use, installation, modification or redistribution of
+ this Apple software constitutes acceptance of these terms.  If you do
+ not agree with these terms, please do not use, install, modify or
+ redistribute this Apple software.
+ 
+ In consideration of your agreement to abide by the following terms, and
+ subject to these terms, Apple grants you a personal, non-exclusive
+ license, under Apple's copyrights in this original Apple software (the
+ "Apple Software"), to use, reproduce, modify and redistribute the Apple
+ Software, with or without modifications, in source and/or binary forms;
+ provided that if you redistribute the Apple Software in its entirety and
+ without modifications, you must retain this notice and the following
+ text and disclaimers in all such redistributions of the Apple Software.
+ Neither the name, trademarks, service marks or logos of Apple Inc. may
+ be used to endorse or promote products derived from the Apple Software
+ without specific prior written permission from Apple.  Except as
+ expressly stated in this notice, no other rights or licenses, express or
+ implied, are granted by Apple herein, including but not limited to any
+ patent rights that may be infringed by your derivative works or by other
+ works in which the Apple Software may be incorporated.
+ 
+ The Apple Software is provided by Apple on an "AS IS" basis.  APPLE
+ MAKES NO WARRANTIES, EXPRESS OR IMPLIED, INCLUDING WITHOUT LIMITATION
+ THE IMPLIED WARRANTIES OF NON-INFRINGEMENT, MERCHANTABILITY AND FITNESS
+ FOR A PARTICULAR PURPOSE, REGARDING THE APPLE SOFTWARE OR ITS USE AND
+ OPERATION ALONE OR IN COMBINATION WITH YOUR PRODUCTS.
+ 
+ IN NO EVENT SHALL APPLE BE LIABLE FOR ANY SPECIAL, INDIRECT, INCIDENTAL
+ OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+ INTERRUPTION) ARISING IN ANY WAY OUT OF THE USE, REPRODUCTION,
+ MODIFICATION AND/OR DISTRIBUTION OF THE APPLE SOFTWARE, HOWEVER CAUSED
+ AND WHETHER UNDER THEORY OF CONTRACT, TORT (INCLUDING NEGLIGENCE),
+ STRICT LIABILITY OR OTHERWISE, EVEN IF APPLE HAS BEEN ADVISED OF THE
+ POSSIBILITY OF SUCH DAMAGE.
+ 
+ Copyright (C) 2012 Apple Inc. All Rights Reserved.
+ 
+ 
+ */
 
 
 #include "AQPlayer.h"
 
 void AQPlayer::AQBufferCallback(void *					inUserData,
-								AudioQueueRef			inAQ,
-								AudioQueueBufferRef		inCompleteAQBuffer) 
+                                AudioQueueRef			inAQ,
+                                AudioQueueBufferRef		inCompleteAQBuffer)
 {
-	AQPlayer *THIS = (AQPlayer *)inUserData;
-
+    AQPlayer *THIS = (AQPlayer *)inUserData;
+    
     // 已经结束，不再做任何处理
-	if (THIS->mIsDone) return;
-
-	UInt32 numBytes;
+    if (THIS->mIsDone) return;
+    
+    UInt32 numBytes;
     // 获取要读取的包的数量
-	UInt32 nPackets = THIS->GetNumPacketsToRead();
+    UInt32 nPackets = THIS->GetNumPacketsToRead();
     /**
      从音频数据中读包，第一个参数是文件格式，第二个用不用缓存，第三个是读取到的数据量，以字节计
      第四个参数是读取到的音频包的描述，第五个从哪个 index 开始读，第六个读到的包的数量，第七个读取的包数据。
@@ -70,54 +70,53 @@ void AQPlayer::AQBufferCallback(void *					inUserData,
      
      但：有没有可能从当前处理的多条音频中，获取符合指定的 FileID 的来读取数据呢？是有可能的。
      */
-	OSStatus result = AudioFileReadPackets(THIS->GetAudioFileID(), false, &numBytes, inCompleteAQBuffer->mPacketDescriptions, THIS->GetCurrentPacket(), &nPackets,
-										   inCompleteAQBuffer->mAudioData);
-	if (result)
-		printf("AudioFileReadPackets failed: %d", (int)result);
-	if (nPackets > 0) {
+    OSStatus result = AudioFileReadPackets(THIS->GetAudioFileID(), false, &numBytes, inCompleteAQBuffer->mPacketDescriptions, THIS->GetCurrentPacket(), &nPackets,
+                                           inCompleteAQBuffer->mAudioData);
+    if (result)
+        printf("AudioFileReadPackets failed: %d", (int)result);
+    if (nPackets > 0) {
         // 要压进队列的 buffer 字节大小，播放时此值必须设置
-		inCompleteAQBuffer->mAudioDataByteSize = numBytes;
+        inCompleteAQBuffer->mAudioDataByteSize = numBytes;
         // buffer 中有效的包描述数量，播放时，此值由人来设置
-		inCompleteAQBuffer->mPacketDescriptionCount = nPackets;
+        inCompleteAQBuffer->mPacketDescriptionCount = nPackets;
         // 带有 mPacketDescription 的 AudioBuffer，最后一个参数可以传 NULL
         /*
          这一步是压进队列的操作
          */
-		AudioQueueEnqueueBuffer(inAQ, inCompleteAQBuffer, 0, NULL);
+        AudioQueueEnqueueBuffer(inAQ, inCompleteAQBuffer, 0, NULL);
         // 设置当前包的偏移量
-		THIS->mCurrentPacket = (THIS->GetCurrentPacket() + nPackets);
-	}
-	// 读不到任何数据
-	else 
-	{
-		if (THIS->IsLooping())
-		{
+        THIS->mCurrentPacket = (THIS->GetCurrentPacket() + nPackets);
+    }
+    // 读不到任何数据
+    else
+    {
+        if (THIS->IsLooping())
+        {
             // 重设当前包的偏移量为 0
-			THIS->mCurrentPacket = 0;
-			AQBufferCallback(inUserData, inAQ, inCompleteAQBuffer);
-		}
-		else
-		{
+            THIS->mCurrentPacket = 0;
+            AQBufferCallback(inUserData, inAQ, inCompleteAQBuffer);
+        }
+        else
+        {
             // 停止播放
-			// stop
-			THIS->mIsDone = true;
-			AudioQueueStop(inAQ, false);
-		}
-	}
+            // stop
+            THIS->mIsDone = true;
+            AudioQueueStop(inAQ, false);
+        }
+    }
 }
 
 void AQPlayer::isRunningProc (  void *              inUserData,
-								AudioQueueRef           inAQ,
-								AudioQueuePropertyID    inID)
+                              AudioQueueRef           inAQ,
+                              AudioQueuePropertyID    inID)
 {
-	AQPlayer *THIS = (AQPlayer *)inUserData;
-	UInt32 size = sizeof(THIS->mIsRunning);
-	OSStatus result = AudioQueueGetProperty (inAQ, kAudioQueueProperty_IsRunning, &THIS->mIsRunning, &size);
-	
-	if ((result == noErr) && (!THIS->mIsRunning))
-		[[NSNotificationCenter defaultCenter] postNotificationName: @"playbackQueueStopped" object: nil];
+    AQPlayer *THIS = (AQPlayer *)inUserData;
+    UInt32 size = sizeof(THIS->mIsRunning);
+    OSStatus result = AudioQueueGetProperty (inAQ, kAudioQueueProperty_IsRunning, &THIS->mIsRunning, &size);
+    
+    if ((result == noErr) && (!THIS->mIsRunning))
+        [[NSNotificationCenter defaultCenter] postNotificationName: @"playbackQueueStopped" object: nil];
 }
-
 
 /// 计算一定时间的 buffer 需要的字节数。
 /// @param inDesc 输入的基本信息描述。
@@ -127,106 +126,106 @@ void AQPlayer::isRunningProc (  void *              inUserData,
 /// @param outNumPackets 输出的包数量。
 void AQPlayer::CalculateBytesForTime (CAStreamBasicDescription & inDesc, UInt32 inMaxPacketSize, Float64 inSeconds, UInt32 *outBufferSize, UInt32 *outNumPackets)
 {
-	// we only use time here as a guideline
-	// we're really trying to get somewhere between 16K and 64K buffers, but not allocate too much if we don't need it
-	static const int maxBufferSize = 0x10000; // limit size to 64K
-	static const int minBufferSize = 0x4000; // limit size to 16K
-	
+    // we only use time here as a guideline
+    // we're really trying to get somewhere between 16K and 64K buffers, but not allocate too much if we don't need it
+    static const int maxBufferSize = 0x10000; // limit size to 64K
+    static const int minBufferSize = 0x4000; // limit size to 16K
+    
     // 未压缩音频数据，此值恒为 1
     // 可变码率音频数据，此值是一个较大的固定的值，AAC 是 1024
     // 如果音频每个包的帧数不一样如 ogg，这个值就是 0
-	if (inDesc.mFramesPerPacket) {
-		Float64 numPacketsForTime = inDesc.mSampleRate / inDesc.mFramesPerPacket * inSeconds;
-		*outBufferSize = numPacketsForTime * inMaxPacketSize;
-	} else {
-		// if frames per packet is zero, then the codec has no predictable packet == time
-		// so we can't tailor this (we don't know how many Packets represent a time period
-		// we'll just return a default buffer size
-		*outBufferSize = maxBufferSize > inMaxPacketSize ? maxBufferSize : inMaxPacketSize;
-	}
-	
-	// we're going to limit our size to our default
-	if (*outBufferSize > maxBufferSize && *outBufferSize > inMaxPacketSize)
-		*outBufferSize = maxBufferSize;
-	else {
-		// also make sure we're not too small - we don't want to go the disk for too small chunks
-		if (*outBufferSize < minBufferSize)
-			*outBufferSize = minBufferSize;
-	}
-	*outNumPackets = *outBufferSize / inMaxPacketSize;
+    if (inDesc.mFramesPerPacket) {
+        Float64 numPacketsForTime = inDesc.mSampleRate / inDesc.mFramesPerPacket * inSeconds;
+        *outBufferSize = numPacketsForTime * inMaxPacketSize;
+    } else {
+        // if frames per packet is zero, then the codec has no predictable packet == time
+        // so we can't tailor this (we don't know how many Packets represent a time period
+        // we'll just return a default buffer size
+        *outBufferSize = maxBufferSize > inMaxPacketSize ? maxBufferSize : inMaxPacketSize;
+    }
+    
+    // we're going to limit our size to our default
+    if (*outBufferSize > maxBufferSize && *outBufferSize > inMaxPacketSize)
+        *outBufferSize = maxBufferSize;
+    else {
+        // also make sure we're not too small - we don't want to go the disk for too small chunks
+        if (*outBufferSize < minBufferSize)
+            *outBufferSize = minBufferSize;
+    }
+    *outNumPackets = *outBufferSize / inMaxPacketSize;
 }
 
 AQPlayer::AQPlayer() :
-	mQueue(0),
-	mAudioFile(0),
-	mFilePath(NULL),
-	mIsRunning(false),
-	mIsInitialized(false),
-	mNumPacketsToRead(0),
-	mCurrentPacket(0),
-	mIsDone(false),
-	mIsLooping(false) { }
+mQueue(0),
+mAudioFile(0),
+mFilePath(NULL),
+mIsRunning(false),
+mIsInitialized(false),
+mNumPacketsToRead(0),
+mCurrentPacket(0),
+mIsDone(false),
+mIsLooping(false) { }
 
 AQPlayer::~AQPlayer() 
 {
-	DisposeQueue(true);
+    DisposeQueue(true);
 }
 
 OSStatus AQPlayer::StartQueue(BOOL inResume)
 {	
-	// if we have a file but no queue, create one now
-	if ((mQueue == NULL) && (mFilePath != NULL)) CreateQueueForFile(mFilePath);
-	
-	mIsDone = false;
-	
-	// if we are not resuming, we also should restart the file read index
-	if (!inResume) {
-		mCurrentPacket = 0;
-
+    // if we have a file but no queue, create one now
+    if ((mQueue == NULL) && (mFilePath != NULL)) CreateQueueForFile(mFilePath);
+    
+    mIsDone = false;
+    
+    // if we are not resuming, we also should restart the file read index
+    if (!inResume) {
+        mCurrentPacket = 0;
+        
         // prime the queue with some data before starting
         for (int i = 0; i < kNumberBuffers; ++i) {
-            AQBufferCallback (this, mQueue, mBuffers[i]);			
+            AQBufferCallback (this, mQueue, mBuffers[i]);
         }
     }
-	return AudioQueueStart(mQueue, NULL);
+    return AudioQueueStart(mQueue, NULL);
 }
 
 OSStatus AQPlayer::StopQueue()
 {
     mIsDone = true;
     
-	OSStatus result = AudioQueueStop(mQueue, true);
-	if (result) printf("ERROR STOPPING QUEUE!\n");
-
-	return result;
+    OSStatus result = AudioQueueStop(mQueue, true);
+    if (result) printf("ERROR STOPPING QUEUE!\n");
+    
+    return result;
 }
 
 OSStatus AQPlayer::PauseQueue()
 {
-	OSStatus result = AudioQueuePause(mQueue);
-
-	return result;
+    OSStatus result = AudioQueuePause(mQueue);
+    
+    return result;
 }
 
 void AQPlayer::CreateQueueForFile(CFStringRef inFilePath) 
 {
     // 初始化要指定为 NULL
-	CFURLRef sndFile = NULL; 
-
-	try {
-		if (mFilePath == NULL)
-		{
+    CFURLRef sndFile = NULL;
+    
+    try {
+        if (mFilePath == NULL)
+        {
             // 不需要循环
-			mIsLooping = false;
-			
+            mIsLooping = false;
+            
             // 使用提供的路径来创建 CFURLRef
             // 参数解释：第一个是空间分配器，用来给要生成的 CF 对象分配内存，传 NULL 或 kCFAllocatorDefault 就行了
             // 第二个是路径的字符串
             // 第三个是 CFURL 的路径风格，只有两种，这里选择默认的 POSIX 风格
             // 第四个告诉是否目录
-			sndFile = CFURLCreateWithFileSystemPath(kCFAllocatorDefault, inFilePath, kCFURLPOSIXPathStyle, false);
-			if (!sndFile) { printf("can't parse file path\n"); return; }
-			
+            sndFile = CFURLCreateWithFileSystemPath(kCFAllocatorDefault, inFilePath, kCFURLPOSIXPathStyle, false);
+            if (!sndFile) { printf("can't parse file path\n"); return; }
+            
             // AudioFile 打开 URL
             // 参数第一个是 CFURL 路径
             // 第二个告诉处理文件的权限，是读还是写还是读写
@@ -236,27 +235,27 @@ void AQPlayer::CreateQueueForFile(CFStringRef inFilePath)
             OSStatus rc = AudioFileOpenURL (sndFile, kAudioFileReadPermission, 0/*inFileTypeHint*/, &mAudioFile);
             // 所有 CF 对象，不用了的时候，要释放掉，不然编译器会提示没释放
             CFRelease(sndFile); // release sndFile here to quiet analyzer
-			XThrowIfError(rc, "can't open file");
-             
-			UInt32 size = sizeof(mDataFormat);
+            XThrowIfError(rc, "can't open file");
+            
+            UInt32 size = sizeof(mDataFormat);
             // 获取音频数据描述
             // 参数第一个是文件
             // 第二个是要获取的属性，这里指明是数据格式
             // 第三个要写入的数据大小
             // 第四个写入格式的具体信息，本函数会 duplicate 一份基本描述信息出来，
             // 这个数据体的内存管理，由调用者来负责
-			XThrowIfError(AudioFileGetProperty(mAudioFile, kAudioFilePropertyDataFormat, &size, &mDataFormat), "couldn't get file's data format");
+            XThrowIfError(AudioFileGetProperty(mAudioFile, kAudioFilePropertyDataFormat, &size, &mDataFormat), "couldn't get file's data format");
             // CF 对象的复制，都有单独的方法的
             // 这里是单独再分配内存，把传进来的 filePath 赋值给 mFilePath
-			mFilePath = CFStringCreateCopy(kCFAllocatorDefault, inFilePath);
-		}
+            mFilePath = CFStringCreateCopy(kCFAllocatorDefault, inFilePath);
+        }
         // 初始化一个新的队列
-		SetupNewQueue();		
+        SetupNewQueue();
     }
-	catch (CAXException e) {
-		char buf[256];
-		fprintf(stderr, "Error: %s (%s)\n", e.mOperation, e.FormatError(buf));
-	}
+    catch (CAXException e) {
+        char buf[256];
+        fprintf(stderr, "Error: %s (%s)\n", e.mOperation, e.FormatError(buf));
+    }
 }
 
 void AQPlayer::SetupNewQueue() 
@@ -271,35 +270,35 @@ void AQPlayer::SetupNewQueue()
     // 第五个 RunLoopMode
     // 第六个 保留未来使用，必须设为 0
     // 第七个 生成的 AudioQueueRef ，会赋值给传进去的 AudioQueueRef 指针
-	XThrowIfError(AudioQueueNewOutput(&mDataFormat, AQPlayer::AQBufferCallback, this, 
-										CFRunLoopGetCurrent(), kCFRunLoopCommonModes, 0, &mQueue), "AudioQueueNew failed");
-	UInt32 bufferByteSize;		
-	// we need to calculate how many packets we read at a time, and how big a buffer we need
-	// we base this on the size of the packets in the file and an approximate duration for each buffer
-	// first check to see what the max size of a packet is - if it is bigger
-	// than our allocation default size, that needs to become larger
+    XThrowIfError(AudioQueueNewOutput(&mDataFormat, AQPlayer::AQBufferCallback, this,
+                                      CFRunLoopGetCurrent(), kCFRunLoopCommonModes, 0, &mQueue), "AudioQueueNew failed");
+    UInt32 bufferByteSize;
+    // we need to calculate how many packets we read at a time, and how big a buffer we need
+    // we base this on the size of the packets in the file and an approximate duration for each buffer
+    // first check to see what the max size of a packet is - if it is bigger
+    // than our allocation default size, that needs to become larger
     // 我们需要计算我们一次读多少个包，以及我们需要一个 buffer 有多大
     // 我们基于文件中包的大小和每个 buffer 大概的持续时间
     // 首先，检查一下看看一个包的最大尺寸是多少——如果它比我们分配的默认尺寸大，那就需要扩大 buffer 的尺寸
     
-	UInt32 maxPacketSize;
-	UInt32 size = sizeof(maxPacketSize);
+    UInt32 maxPacketSize;
+    UInt32 size = sizeof(maxPacketSize);
     // 获取音频文件信息 理论最大包尺寸
     // 第一个参数 文件指针
     // 第二个 要获取的属性，这里指定为 包尺寸的上限边界；这个 key 代表的是理论上的，如果要获取实际上的，使用 kAudioFilePropertyMaximumPacketSize
     // 第三个 写入数据的大小
     // 第四个 写入读取到的数据，这里是最大的包的尺寸
-	XThrowIfError(AudioFileGetProperty(mAudioFile, 
-									   kAudioFilePropertyPacketSizeUpperBound, &size, &maxPacketSize), "couldn't get file's max packet size");
-	
-	// adjust buffer size to represent about a half second of audio based on this format
+    XThrowIfError(AudioFileGetProperty(mAudioFile,
+                                       kAudioFilePropertyPacketSizeUpperBound, &size, &maxPacketSize), "couldn't get file's max packet size");
+    
+    // adjust buffer size to represent about a half second of audio based on this format
     // 调整 buffer 尺寸来代表大约半秒钟的基于此制式（format）的音频数据
-	CalculateBytesForTime (mDataFormat, maxPacketSize, kBufferDurationSeconds, &bufferByteSize, &mNumPacketsToRead);
-
-		//printf ("Buffer Byte Size: %d, Num Packets to Read: %d\n", (int)bufferByteSize, (int)mNumPacketsToRead);
-	
-	// (2) If the file has a cookie, we should get it and set it on the AQ
-	size = sizeof(UInt32);
+    CalculateBytesForTime (mDataFormat, maxPacketSize, kBufferDurationSeconds, &bufferByteSize, &mNumPacketsToRead);
+    
+    //printf ("Buffer Byte Size: %d, Num Packets to Read: %d\n", (int)bufferByteSize, (int)mNumPacketsToRead);
+    
+    // (2) If the file has a cookie, we should get it and set it on the AQ
+    size = sizeof(UInt32);
     // 获取 AudioFile 的属性信息 property info 这里是魔法曲奇数据
     // Magic Cookie Data
     // kAudioFilePropertyMagicCookieData
@@ -315,67 +314,81 @@ void AQPlayer::SetupNewQueue()
     
     
     // 魔法曲奇的其他介绍
-    // Some audio formats have an magic cookie associated with them that are required to decompress audio data. Magic cookies (some times called magic numbers) are information included in audio file headers that are used to describe data formats. When converting audio data you must check to see if the format of the data has a magic cookie. If the audio data format has a magic cookie associated with it, you must need to add this information to an audio converter using AudioConverterSetProperty and kAudioConverterDecompressionMagicCookie to appropriately decompress the Audio File.
-    // Note: Most data formats do not have magic cookie information, but you must check before converting the data.
+    // Some audio formats have an magic cookie associated with them that are required to decompress
+    // audio data. Magic cookies (some times called magic numbers) are information included in audio
+    // file headers that are used to describe data formats. When converting audio data you must
+    // check to see if the format of the data has a magic cookie. If the audio data format has a
+    // magic cookie associated with it, you must need to add this information to an audio converter
+    // using AudioConverterSetProperty and kAudioConverterDecompressionMagicCookie to appropriately
+    // decompress the Audio File.
+    // Note: Most data formats do not have magic cookie information, but you must check before
+    // converting the data.
     
-    // 一些音频制式拥有一个魔法曲奇关联着它们，这个曲奇是需要解压缩的音频数据。魔法曲奇（有时也称为魔法数字）是包括在音频文件头部中的信息，用来描述音频制式。当转换音频数据时，你必须检查来看一下是否那个数据的制式有一个魔法曲奇。如果这个音频数据制式有一个魔法曲奇关联着它，你必须得（must need to）添加这个信息到一个音频转换器上，使用 AudioConverterSetProperty 和 kAudioConverterDecompressionMagicCookie 来恰当地解压缩这个 Audio File 。
-    // 注意：大多数数据制式并不会有魔法曲奇信息，但你必须在转换数据前检查一下（，以防万一）。
-
-	OSStatus result = AudioFileGetPropertyInfo (mAudioFile, kAudioFilePropertyMagicCookieData, &size, NULL);
-	
-	if (!result && size) {
-		char* cookie = new char [size];		
-		XThrowIfError (AudioFileGetProperty (mAudioFile, kAudioFilePropertyMagicCookieData, &size, cookie), "get cookie from file");
-		XThrowIfError (AudioQueueSetProperty(mQueue, kAudioQueueProperty_MagicCookie, cookie, size), "set cookie on queue");
-		delete [] cookie;
-	}
-	
-	// channel layout?
-	result = AudioFileGetPropertyInfo(mAudioFile, kAudioFilePropertyChannelLayout, &size, NULL);
-	if (result == noErr && size > 0) {
-		AudioChannelLayout *acl = (AudioChannelLayout *)malloc(size);
+    // 一些音频制式拥有一个魔法曲奇关联着它们，这个曲奇是需要解压缩的音频数据。魔法曲奇（有时也称为魔法数字）是包括在音频
+    // 文件头部中的信息，用来描述音频制式。当转换音频数据时，你必须检查来看一下是否那个数据的制式有一个魔法曲奇。如果这个
+    // 音频数据制式有一个魔法曲奇关联着它，你必须得（must need to）添加这个信息到一个音频转换器上，使用
+    // AudioConverterSetProperty 和 kAudioConverterDecompressionMagicCookie 来恰当地解压缩这个 Audio
+    // File 。
+    // 注意：大多数数据制式并不会有魔法曲奇信息，但你必须在转换数据前检查一下。
+    
+    OSStatus result = AudioFileGetPropertyInfo (mAudioFile, kAudioFilePropertyMagicCookieData, &size, NULL);
+    
+    if (!result && size) {
+        /**
+         根据上面的解释，这里就是从文件中获取到了魔法曲奇，然后将它设置给 Audio Queue 的属性 kAudioQueueProperty_MagicCookie 。
+         */
+        char* cookie = new char [size];
+        XThrowIfError (AudioFileGetProperty (mAudioFile, kAudioFilePropertyMagicCookieData, &size, cookie), "get cookie from file");
+        XThrowIfError (AudioQueueSetProperty(mQueue, kAudioQueueProperty_MagicCookie, cookie, size), "set cookie on queue");
+        delete [] cookie;
+    }
+    
+    // channel layout?
+    result = AudioFileGetPropertyInfo(mAudioFile, kAudioFilePropertyChannelLayout, &size, NULL);
+    if (result == noErr && size > 0) {
+        AudioChannelLayout *acl = (AudioChannelLayout *)malloc(size);
         
         result = AudioFileGetProperty(mAudioFile, kAudioFilePropertyChannelLayout, &size, acl);
         if (result) { free(acl); XThrowIfError(result, "get audio file's channel layout"); }
         
         result = AudioQueueSetProperty(mQueue, kAudioQueueProperty_ChannelLayout, acl, size);
         if (result){ free(acl); XThrowIfError(result, "set channel layout on queue"); }
-		
+        
         free(acl);
     }
-	
-	XThrowIfError(AudioQueueAddPropertyListener(mQueue, kAudioQueueProperty_IsRunning, isRunningProc, this), "adding property listener");
-	
-	bool isFormatVBR = (mDataFormat.mBytesPerPacket == 0 || mDataFormat.mFramesPerPacket == 0);
-	for (int i = 0; i < kNumberBuffers; ++i) {
-		XThrowIfError(AudioQueueAllocateBufferWithPacketDescriptions(mQueue, bufferByteSize, (isFormatVBR ? mNumPacketsToRead : 0), &mBuffers[i]), "AudioQueueAllocateBuffer failed");
-	}	
-
-	// set the volume of the queue
-	XThrowIfError (AudioQueueSetParameter(mQueue, kAudioQueueParam_Volume, 1.0), "set queue volume");
-	
-	mIsInitialized = true;
+    
+    XThrowIfError(AudioQueueAddPropertyListener(mQueue, kAudioQueueProperty_IsRunning, isRunningProc, this), "adding property listener");
+    
+    bool isFormatVBR = (mDataFormat.mBytesPerPacket == 0 || mDataFormat.mFramesPerPacket == 0);
+    for (int i = 0; i < kNumberBuffers; ++i) {
+        XThrowIfError(AudioQueueAllocateBufferWithPacketDescriptions(mQueue, bufferByteSize, (isFormatVBR ? mNumPacketsToRead : 0), &mBuffers[i]), "AudioQueueAllocateBuffer failed");
+    }
+    
+    // set the volume of the queue
+    XThrowIfError (AudioQueueSetParameter(mQueue, kAudioQueueParam_Volume, 1.0), "set queue volume");
+    
+    mIsInitialized = true;
 }
 
 void AQPlayer::DisposeQueue(Boolean inDisposeFile)
 {
-	if (mQueue)
-	{
-		AudioQueueDispose(mQueue, true);
-		mQueue = NULL;
-	}
-	if (inDisposeFile)
-	{
-		if (mAudioFile)
-		{		
-			AudioFileClose(mAudioFile);
-			mAudioFile = 0;
-		}
-		if (mFilePath)
-		{
-			CFRelease(mFilePath);
-			mFilePath = NULL;
-		}
-	}
-	mIsInitialized = false;
+    if (mQueue)
+    {
+        AudioQueueDispose(mQueue, true);
+        mQueue = NULL;
+    }
+    if (inDisposeFile)
+    {
+        if (mAudioFile)
+        {
+            AudioFileClose(mAudioFile);
+            mAudioFile = 0;
+        }
+        if (mFilePath)
+        {
+            CFRelease(mFilePath);
+            mFilePath = NULL;
+        }
+    }
+    mIsInitialized = false;
 }
