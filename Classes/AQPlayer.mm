@@ -344,6 +344,7 @@ void AQPlayer::SetupNewQueue()
     }
     
     // channel layout?
+    // 声道布局？
     result = AudioFileGetPropertyInfo(mAudioFile, kAudioFilePropertyChannelLayout, &size, NULL);
     if (result == noErr && size > 0) {
         AudioChannelLayout *acl = (AudioChannelLayout *)malloc(size);
@@ -351,12 +352,57 @@ void AQPlayer::SetupNewQueue()
         result = AudioFileGetProperty(mAudioFile, kAudioFilePropertyChannelLayout, &size, acl);
         if (result) { free(acl); XThrowIfError(result, "get audio file's channel layout"); }
         
+        /* kAudioQueueProperty_ChannelLayout 释义
+         Value is a read/write AudioChannelLayout structure that describes an audio queue channel
+         layout. The number of channels in the layout must match the number of channels in the audio
+         format. This property is typically not used in the case of one or two channel audio. For
+         more than two channels (such as in the case of 5.1 surround sound), you may need to specify
+         a channel layout to indicate channel order, such as left, then center, then right.
+         
+         值为一个可读写的 AudioChannelLayout 结构体，描述了一个音频队列（Audio Queue）的声道布局。在布局中的声道数量必须匹配在
+         音频制式中的声道数量。这个属性通常（typically）不会用在只有一个或两个声道的音频中。对于多于两个声道的音频，你可能需要指定
+         一个声道布局来标示声道的序列，如左，然后中，然后右。
+         */
+        
         result = AudioQueueSetProperty(mQueue, kAudioQueueProperty_ChannelLayout, acl, size);
         if (result){ free(acl); XThrowIfError(result, "set channel layout on queue"); }
         
         free(acl);
     }
-    
+    /*
+     Adds a property listener callback to an audio queue.
+     给一个音频队列添加一个属性监听回调函数。
+     Declaration
+     
+     OSStatus AudioQueueAddPropertyListener(AudioQueueRef inAQ, AudioQueuePropertyID inID, AudioQueuePropertyListenerProc inProc, void *inUserData);
+     Discussion
+     
+     Use this function to let your application respond to property value changes in an audio queue.
+     For example, say your application’s user interface has a button that acts as a Play/Stop toggle
+     switch. When an audio file has finished playing, the audio queue stops and the value of the
+     kAudioQueueProperty_IsRunning property changes from true to false. You can use a property listener
+     callback to update the button text appropriately.
+     
+     使用此函数来让你的应用对一个音频队列中的属性值改变做出回应（respond）。举个例子，比方说你的应用程序的用户界面有一个按钮，
+     充当一个播放/停止的拨动开关。当一个音频文件已经结束了播放，音频队列停止，且 kAudioQueueProperty_IsRunning
+     属性的值会从 true 变为 false 。你可以使用一个属性监听回调函数来适当地更新按钮的文字。
+     
+     Parameters
+     
+     inAQ
+     The audio queue that you want to assign a property listener callback to.
+     要监听的音频队列。
+     inID
+     The ID of the property whose changes you want to respond to. See AudioQueuePropertyID.
+     要监听的属性 ID 。
+     inProc
+     The callback to be invoked when the property value changes.
+     回调函数。
+     inUserData
+     Custom data for the property listener callback.
+     自定义的数据，可在回调函数中使用。
+     */
+    // 监听音频队列的 IsRunning 属性值改变
     XThrowIfError(AudioQueueAddPropertyListener(mQueue, kAudioQueueProperty_IsRunning, isRunningProc, this), "adding property listener");
     
     bool isFormatVBR = (mDataFormat.mBytesPerPacket == 0 || mDataFormat.mFramesPerPacket == 0);
