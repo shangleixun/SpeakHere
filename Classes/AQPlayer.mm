@@ -120,9 +120,9 @@ void AQPlayer::isRunningProc (  void *              inUserData,
 
 /// 计算一定时间的 buffer 需要的字节数。
 /// @param inDesc 输入的基本信息描述。
-/// @param inMaxPacketSize 输入的最大包体积。
+/// @param inMaxPacketSize 输入的理论最大包体积。
 /// @param inSeconds 输入的时间长度。这里是半秒。
-/// @param outBufferSize 输出的 buffer 的尺寸。
+/// @param outBufferSize 输出的缓冲区的体积。
 /// @param outNumPackets 输出的包数量。
 void AQPlayer::CalculateBytesForTime (CAStreamBasicDescription & inDesc, UInt32 inMaxPacketSize, Float64 inSeconds, UInt32 *outBufferSize, UInt32 *outNumPackets)
 {
@@ -131,16 +131,49 @@ void AQPlayer::CalculateBytesForTime (CAStreamBasicDescription & inDesc, UInt32 
     static const int maxBufferSize = 0x10000; // limit size to 64K
     static const int minBufferSize = 0x4000; // limit size to 16K
     
+    /**
+     struct AudioStreamBasicDescription
+     {
+     Float64             mSampleRate; // 采样率，如 8000 Hz 或 16000 Hz 或 44.1 kHz
+     AudioFormatID       mFormatID; // 制式（注意，format 翻译为制式，而不是格式，是为了提醒读者特别注意）的唯一标识符
+     AudioFormatFlags    mFormatFlags; // 制式标识
+     UInt32              mBytesPerPacket; // 每包字节数
+     UInt32              mFramesPerPacket; // 每包帧数（注意：此帧实际上是采样），此值不是所有制式都有的，注意！
+     UInt32              mBytesPerFrame; // 每帧字节数，一定有的
+     UInt32              mChannelsPerFrame; // 声道数每帧，一般整个音频文件的声道数不会乱变，此值一般代表了整体音频的声道数量
+     UInt32              mBitsPerChannel; // 位数每通道，量化深度，一般是 16 bit ，即本通道每个采样占用 16 个比特的数据
+     UInt32              mReserved; // 保留的
+     };
+     
+     ASBD 释义
+     
+     */
+    
+    // 帧数每包 其实正确的名称应该是采样数每包，而音频的帧率其实是：每秒几个 packet
+    // Core Audio 中的 PACKET == real FRAME （这样算下来，AAC 的帧率就是 44100 / 1024 == 43.066 FPS ）
+    // 而 Core Audio 中的 FRAME == real SAMPLE
     // 未压缩音频数据，此值恒为 1
     // 可变码率音频数据，此值是一个较大的固定的值，AAC 是 1024
     // 如果音频每个包的帧数不一样如 ogg，这个值就是 0
     if (inDesc.mFramesPerPacket) {
+        /**
+         The number of frames in a packet of audio data. For uncompressed audio, the value is 1. For variable bit-rate formats, the value is a larger fixed number, such as 1024 for AAC. For formats with a variable number of frames per packet, such as Ogg Vorbis, set this field to 0.
+         一个音频包中的帧数量。对未压缩的音频，此值为 1。对可变比特率的制式，此值为一个较大的固定值，像 AAC 是 1024。对那种每个包里是一个可变数量的帧，像 Ogg Vorbis ，设此字段为 0。
+         */
+        // 固定时间长度（秒计）的包的数量
+        // 采样率是一秒采几个样，除以每个包的采样率，得出一秒有几个包，再乘以秒数，得出此秒数对应的包的数量
+        // 求出了此度时对应的包的数量，再乘以最大理论包大小，就得出此度时需要的字节数
         Float64 numPacketsForTime = inDesc.mSampleRate / inDesc.mFramesPerPacket * inSeconds;
         *outBufferSize = numPacketsForTime * inMaxPacketSize;
     } else {
         // if frames per packet is zero, then the codec has no predictable packet == time
         // so we can't tailor this (we don't know how many Packets represent a time period
         // we'll just return a default buffer size
+        // 如果帧数每包为 0 ，则解码器就没有可预测的包来适配给定的度时
+        // 因此我们就办不到这件事了（我们不知道一个时间段得要多少包来表示）
+        // 我们就仅仅返回一个默认的缓冲区体积就好了
+        
+        // 两者取其大者
         *outBufferSize = maxBufferSize > inMaxPacketSize ? maxBufferSize : inMaxPacketSize;
     }
     
@@ -407,6 +440,21 @@ void AQPlayer::SetupNewQueue()
     
     bool isFormatVBR = (mDataFormat.mBytesPerPacket == 0 || mDataFormat.mFramesPerPacket == 0);
     for (int i = 0; i < kNumberBuffers; ++i) {
+        
+        /**
+         Asks an audio queue object to allocate an audio queue buffer with space for packet descriptions.
+         Use this function when allocating an audio queue buffer for use with a VBR compressed data format.
+         Once allocated, the pointer to the audio queue buffer and the buffer’s capacity cannot be changed. The buffer’s size field, mAudioDataByteSize, which indicates the amount of valid data, is initially set to 0.
+         
+         */
+        /**
+         mQueue 使用的音频队列
+         bufferBytesSize 要分配的缓冲区的字节大小
+         如果是 VBR 制式，就使用上面函数计算出来的 bufferBytesSize 这个大小需要的包的数量，如果不是，传 0 即可
+         （接上段）这里指示的是，新生成的缓冲区中的 ASPD 数组的数量。bufferBytesSize 此音频文件半秒钟的字节大小
+         通过除以理论最大包体积，得到半秒钟的时间有多少个包，一个包对应一个 ASPD ，所以这里传的是 nNumPacketsToRead 。
+         mBuffers[i] 使用生成的缓冲区的指针赋值，也即，把生成的缓冲区的指针传出来，以便后面使用，这里生成了三个缓冲区
+         */
         XThrowIfError(AudioQueueAllocateBufferWithPacketDescriptions(mQueue, bufferByteSize, (isFormatVBR ? mNumPacketsToRead : 0), &mBuffers[i]), "AudioQueueAllocateBuffer failed");
     }
     
@@ -420,21 +468,28 @@ void AQPlayer::DisposeQueue(Boolean inDisposeFile)
 {
     if (mQueue)
     {
+        // 先处理掉音频队列，立即地
         AudioQueueDispose(mQueue, true);
+        // 再置为 NULL
         mQueue = NULL;
     }
     if (inDisposeFile)
     {
         if (mAudioFile)
         {
+            // 关闭音频文件
             AudioFileClose(mAudioFile);
+            // 将指针置为 0
             mAudioFile = 0;
         }
         if (mFilePath)
         {
+            // mFilePath 是 CFURLRef ，所以需要使用 CFRelease 函数来释放
             CFRelease(mFilePath);
+            // 对象指针置为 NULL
             mFilePath = NULL;
         }
     }
+    // 均已置空，等于是状态回归原始未初始化状态
     mIsInitialized = false;
 }
