@@ -56,6 +56,7 @@ int AQRecorder::ComputeRecordBufferSize(const AudioStreamBasicDescription *forma
 {
     int packets, frames, bytes = 0;
     try {
+        // 得到帧数，也即包数——针对未压缩制式
         frames = (int)ceil(seconds * format->mSampleRate);
         
         if (format->mBytesPerFrame > 0)
@@ -188,6 +189,7 @@ void AQRecorder::SetupAudioFormat(UInt32 inFormatID)
         // 线性 PCM
         // 字节每包 = 字节每帧（一个帧就是一个取样）= 比特每声道/8 * 声道数每帧
         mRecordFormat.mBytesPerPacket = mRecordFormat.mBytesPerFrame = (mRecordFormat.mBitsPerChannel / 8) * mRecordFormat.mChannelsPerFrame;
+        // 线性 PCM 每帧即每包
         mRecordFormat.mFramesPerPacket = 1;
     }
 }
@@ -200,6 +202,12 @@ void AQRecorder::StartRecord(CFStringRef inRecordFile)
     
     try {
         // CF 对象有专用的拷贝方法
+        // 拷贝出来的一定是不可改变的（immutable）
+        // 拷贝出来的对象的内在存储特性可能与传进来的 CFStringRef 不同，
+        // 因而 CFStringGetCStringPtr 之类函数对它们的调用，返回的结果可能是不同的
+        // 当使用的分配器和原始的对象是一样的，并且原始对象已经是不可变的时候，这个函数
+        // 只是增加其保留计数而非真实地去拷贝。但结果对象是真的不可变的，只是这样的操作
+        // 效率更高
         mFileName = CFStringCreateCopy(kCFAllocatorDefault, inRecordFile);
         
         // specify the recording format
@@ -218,6 +226,14 @@ void AQRecorder::StartRecord(CFStringRef inRecordFile)
         mRecordPacket = 0;
         
         size = sizeof(mRecordFormat);
+        /**
+         Value is a read-only AudioStreamBasicDescription structure, indicating an audio queue’s data format. Primarily useful for obtaining a complete ASBD when recording, in cases where you initially specify a sample rate of 0.
+         值为一个只读的 ASBD 结构体，标示着一个音频队列的数据制式。当录制时，在你起初明确指定一个采样率为 0 的情形中，为要获得一个完整的 ASBD （这个属性）是非常有用的（primarily useful）。
+         
+         录制的时候，如果你最开始明确指定（specify）了采样率为 0，这个属性就可以获得（obtain）一个完整的 ASBD 。意思是：在获取到的这个
+         完整的 ASBD 内，你就能获取到真实可用的采样率了。
+         这是我的理解。
+         */
         XThrowIfError(AudioQueueGetProperty(mQueue, kAudioQueueProperty_StreamDescription,
                                             &mRecordFormat, &size), "couldn't get queue's format");
         
