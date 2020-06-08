@@ -131,7 +131,7 @@ void AQPlayer::CalculateBytesForTime (CAStreamBasicDescription & inDesc, UInt32 
     static const int maxBufferSize = 0x10000; // limit size to 64K
     static const int minBufferSize = 0x4000; // limit size to 16K
     
-    /**
+    /*
      struct AudioStreamBasicDescription
      {
      Float64             mSampleRate; // 采样率，如 8000 Hz 或 16000 Hz 或 44.1 kHz
@@ -140,7 +140,7 @@ void AQPlayer::CalculateBytesForTime (CAStreamBasicDescription & inDesc, UInt32 
      UInt32              mBytesPerPacket; // 每包字节数
      UInt32              mFramesPerPacket; // 每包帧数（注意：此帧实际上是采样），此值不是所有制式都有的，注意！
      UInt32              mBytesPerFrame; // 每帧字节数，一定有的
-     UInt32              mChannelsPerFrame; // 声道数每帧，一般整个音频文件的声道数不会乱变，此值一般代表了整体音频的声道数量
+     UInt32              mChannelsPerFrame; // 声道数每帧，一般整个音频文件的声道数是一致的
      UInt32              mBitsPerChannel; // 位数每通道，量化深度，一般是 16 bit ，即本通道每个采样占用 16 个比特的数据
      UInt32              mReserved; // 保留的
      };
@@ -153,12 +153,16 @@ void AQPlayer::CalculateBytesForTime (CAStreamBasicDescription & inDesc, UInt32 
     // Core Audio 中的 PACKET == real FRAME （这样算下来，AAC 的帧率就是 44100 / 1024 == 43.066 FPS ）
     // 而 Core Audio 中的 FRAME == real SAMPLE
     // 未压缩音频数据，此值恒为 1
-    // 可变码率音频数据，此值是一个较大的固定的值，AAC 是 1024
+    // 可变码率音频数据，此值是一个较大的固定数字，AAC 是 1024（即一个音频包包含了 1024 个音频采样）
     // 如果音频每个包的帧数不一样如 ogg，这个值就是 0
     if (inDesc.mFramesPerPacket) {
-        /**
-         The number of frames in a packet of audio data. For uncompressed audio, the value is 1. For variable bit-rate formats, the value is a larger fixed number, such as 1024 for AAC. For formats with a variable number of frames per packet, such as Ogg Vorbis, set this field to 0.
-         一个音频包中的帧数量。对未压缩的音频，此值为 1。对可变比特率的制式，此值为一个较大的固定值，像 AAC 是 1024。对那种每个包里是一个可变数量的帧，像 Ogg Vorbis ，设此字段为 0。
+        /*
+         The number of frames in a packet of audio data. For uncompressed audio, the value is 1.
+         For variable bit-rate formats, the value is a larger fixed number, such as 1024 for AAC.
+         For formats with a variable number of frames per packet, such as Ogg Vorbis, set this field to 0.
+         
+         一个音频包中的帧数量。对未压缩的音频，此值为 1。对可变比特率的制式，此值为一个较大的固定数字，像 AAC 是 1024。
+         对那种每个包里有一个可变数量的帧的制式，像 Ogg Vorbis ，设置此字段为 0。
          */
         // 固定时间长度（秒计）的包的数量
         // 采样率是一秒采几个样，除以每个包的采样率，得出一秒有几个包，再乘以秒数，得出此秒数对应的包的数量
@@ -392,9 +396,10 @@ void AQPlayer::SetupNewQueue()
          more than two channels (such as in the case of 5.1 surround sound), you may need to specify
          a channel layout to indicate channel order, such as left, then center, then right.
          
-         值为一个可读写的 AudioChannelLayout 结构体，描述了一个音频队列（Audio Queue）的声道布局。在布局中的声道数量必须匹配在
-         音频制式中的声道数量。这个属性通常（typically）不会用在只有一个或两个声道的音频中。对于多于两个声道（如 5.1 环绕声
-         这种情形）的音频，你可能需要指定一个声道布局来标示声道的序列，如左，然后中，然后右。
+         值为一个可读写的 AudioChannelLayout 结构体，描述了一个音频队列（Audio Queue）的声道布局。
+         在布局中的声道数量必须匹配在音频制式中的声道数量。这个属性通常（typically）不会用在只有一个或
+         两个声道的音频中。对于多于两个声道（如 5.1 环绕声这种情形）的音频，你可能需要指定一个声道布局
+         来标示声道的序列，如左，然后中，然后右。
          */
         
         result = AudioQueueSetProperty(mQueue, kAudioQueueProperty_ChannelLayout, acl, size);
@@ -441,7 +446,7 @@ void AQPlayer::SetupNewQueue()
     bool isFormatVBR = (mDataFormat.mBytesPerPacket == 0 || mDataFormat.mFramesPerPacket == 0);
     for (int i = 0; i < kNumberBuffers; ++i) {
         
-        /**
+        /*
          Summary
          Asks an audio queue object to allocate an audio queue buffer with space for packet descriptions.
          请求一个音频队列对象分配一个音频队列缓冲——有空间为包描述。
@@ -451,7 +456,8 @@ void AQPlayer::SetupNewQueue()
          
          Discussion
          Use this function when allocating an audio queue buffer for use with a VBR compressed data format.
-         Once allocated, the pointer to the audio queue buffer and the buffer’s capacity cannot be changed. The buffer’s size field, mAudioDataByteSize, which indicates the amount of valid data, is initially set to 0.
+         Once allocated, the pointer to the audio queue buffer and the buffer’s capacity cannot be changed.
+         The buffer’s size field, mAudioDataByteSize, which indicates the amount of valid data, is initially set to 0.
          当分配一个音频队列缓冲区以给一个 VBR 压缩数据制式使用时，使用此函数。
          一旦分配过之后，指向音频队列缓冲区的指针以及缓冲区的容量就不可再改变。缓冲区的 size 字段，mAudioDataByteSize ，
          它标示了有效的数据的量，被初始设置为 0。
@@ -461,7 +467,8 @@ void AQPlayer::SetupNewQueue()
          The audio queue you want to allocate a buffer.
          你想要分配一个缓冲的音频队列。
          inBufferByteSize
-         The desired data capacity of the new buffer, in bytes. Appropriate capacity depends on the processing you will perform on the data as well as on the audio data format.
+         The desired data capacity of the new buffer, in bytes. Appropriate capacity depends on the processing
+         you will perform on the data as well as on the audio data format.
          想要的新缓冲的数据容量，以字节计。合适的容量依赖于你想要执行在数据上的进程，也依赖于音频数据制式。
          inNumberPacketDescriptions
          The desired size of the packet description array in the new audio queue buffer.
@@ -475,7 +482,7 @@ void AQPlayer::SetupNewQueue()
          结果码。见 Result Codes。
          
          */
-        /**
+        /*
          mQueue 使用的音频队列
          bufferBytesSize 要分配的缓冲区的字节大小
          如果是 VBR 制式，就使用上面函数计算出来的 bufferBytesSize 这个大小需要的包的数量，如果不是，传 0 即可
