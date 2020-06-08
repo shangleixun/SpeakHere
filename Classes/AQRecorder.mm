@@ -56,25 +56,67 @@ int AQRecorder::ComputeRecordBufferSize(const AudioStreamBasicDescription *forma
 {
     int packets, frames, bytes = 0;
     try {
-        // 得到帧数，也即包数——针对未压缩制式
+        // 得到帧数：时间长度 * 采样率
         frames = (int)ceil(seconds * format->mSampleRate);
         
+        /**
+         mBytesPerFrame 的介绍
+         Summary
+         The number of bytes from the start of one frame to the start of the next frame in an audio buffer. Set this field to 0 for compressed formats.
+         一个音频缓冲（audio buffer）中，从一帧的开始到下一帧的开始的字节数量。为压缩制式设置此字段成 0。
+         
+         Declaration
+         UInt32 mBytesPerFrame;
+         
+         Discussion
+         For an audio buffer containing interleaved data for n channels, with each sample of type AudioSampleType, calculate the value for this field as follows:
+         mBytesPerFrame = n * sizeof (AudioSampleType);
+         For an audio buffer containing noninterleaved (monophonic) data, also using AudioSampleType samples, calculate the value for this field as follows:
+         mBytesPerFrame = sizeof (AudioSampleType);
+         
+         对一个包含着 n 个声道的交叉存取的（interleaved）数据的音频缓冲，兼之每个采样的类型是 AudioSampleType ，计算此字段的值如下：
+         mBytesPerFrame = n * sizeof(AudioSampleType);
+         对一个包含着非交叉存取的（noninterleaved）（单声道的）数据的音频缓冲，亦使用 AudioSampleType 的采样，计算此字段的值如下：
+         mBytesPerFrame = sizeof(AudioSampleType);
+         
+         */
         if (format->mBytesPerFrame > 0)
             bytes = frames * format->mBytesPerFrame;
         else {
             UInt32 maxPacketSize;
+            /**
+             Summary
+             The number of bytes in a packet of audio data. To indicate variable packet size, set this field to 0. For a format that uses variable packet size, specify the size of each packet using an AudioStreamPacketDescription structure.
+             一个音频数据包的字节数量。欲标示可变包体积（variable packet size），设置此字段为 0。对一个使用可变包体积的制式，明确说明（specify）每个包的大小，使用一个 ASPD 结构体。
+             
+             Declaration
+             UInt32 mBytesPerPacket;
+             */
             if (format->mBytesPerPacket > 0)
                 maxPacketSize = format->mBytesPerPacket;	// constant packet size
             else {
+                // 不大于 0，则等于 0，等于 0 时，即为可变包体积的音频制式
                 UInt32 propertySize = sizeof(maxPacketSize);
+                /**
+                 Summary
+                 Value is a read-only UInt32 value that is the size, in bytes, of the largest single packet of data in the output format. Primarily useful when encoding VBR compressed data.
+                 值为一个只读的 UInt32 值，它是在输出制式中最大的单个数据包的大小，以字节计。当编码 VBR 压缩数据时较为有用（primarily useful）。
+                 
+                 Declaration
+                 kAudioQueueProperty_MaximumOutputPacketSize = 'xops'
+                 
+                 */
                 XThrowIfError(AudioQueueGetProperty(mQueue, kAudioQueueProperty_MaximumOutputPacketSize, &maxPacketSize,
                                                     &propertySize), "couldn't get queue's maximum output packet size");
             }
+            // 未压缩音频数据，此值恒为 1
+            // 可变码率音频数据，此值是一个较大的固定的值，AAC 是 1024
+            // 如果音频每个包的帧数不一样如 ogg，这个值就是 0
             if (format->mFramesPerPacket > 0)
                 packets = frames / format->mFramesPerPacket;
             else
                 packets = frames;	// worst-case scenario: 1 frame in a packet
-            if (packets == 0)		// sanity check
+            if (packets == 0)		// sanity check 健全测试；完整性测试
                 packets = 1;
             bytes = packets * maxPacketSize;
         }
@@ -223,16 +265,17 @@ void AQRecorder::StartRecord(CFStringRef inRecordFile)
         
         // get the record format back from the queue's audio converter --
         // the file may require a more specific stream description than was necessary to create the encoder.
+        // 得到录制制式从（back from）队列的音频转换器中——
+        // 文件可能要求一个更明确说明的流描述比创建编码器需要的
         mRecordPacket = 0;
         
         size = sizeof(mRecordFormat);
         /**
          Value is a read-only AudioStreamBasicDescription structure, indicating an audio queue’s data format. Primarily useful for obtaining a complete ASBD when recording, in cases where you initially specify a sample rate of 0.
-         值为一个只读的 ASBD 结构体，标示着一个音频队列的数据制式。当录制时，在你起初明确指定一个采样率为 0 的情形中，为要获得一个完整的 ASBD （这个属性）是非常有用的（primarily useful）。
+         值为一个只读的 ASBD 结构体，标示着一个音频队列的数据制式。当录制时，在你起初明确指定一个采样率为 0 的情形中，为要获得一个完整的 ASBD （这个属性）是较为有用的（primarily useful）。
          
-         录制的时候，如果你最开始明确指定（specify）了采样率为 0，这个属性就可以获得（obtain）一个完整的 ASBD 。意思是：在获取到的这个
+         我的理解：录制的时候，如果你最开始明确指定（specify）了采样率为 0，这个属性就可以获得（obtain）一个完整的 ASBD 。意思是：在获取到的这个
          完整的 ASBD 内，你就能获取到真实可用的采样率了。
-         这是我的理解。
          */
         XThrowIfError(AudioQueueGetProperty(mQueue, kAudioQueueProperty_StreamDescription,
                                             &mRecordFormat, &size), "couldn't get queue's format");
@@ -242,6 +285,32 @@ void AQRecorder::StartRecord(CFStringRef inRecordFile)
         url = CFURLCreateWithString(kCFAllocatorDefault, (CFStringRef)recordFile, NULL);
         
         // create the audio file
+        /*!
+         @enum AudioFileFlags
+         
+         @abstract   These are flags that can be used with the CreateURL API call
+         
+         @constant   kAudioFileFlags_EraseFile
+         If set, then the CreateURL call will erase the contents of an existing file
+         If not set, then the CreateURL call will fail if the file already exists
+         如果设置此选项，则 CreateURL 调用会抹除（erase）一个现有文件的内容；
+         如果不设置此选项，则 CreateURL 调用会失败，如果文件已经存在的话。
+         
+         @constant   kAudioFileFlags_DontPageAlignAudioData
+         Normally, newly created and optimized files will have padding added in order to page align
+         the data to 4KB boundaries. This makes reading the data more efficient.
+         When disk space is a concern, this flag can be set so that the padding will not be added.
+         正常情况下，新创建及优化的文件会添加补白（padding）以页面对齐数据到 4 KB 边界。这使得读取数据更有效率。
+         当硬盘空间是一个问题（is a concern）时，此标记（flag）可被设置以使补白不被添加。
+         */
+        /**
+         第一个参数：inFileRef 完整的明确说明的要创建或初始化的文件的路径。
+         第二个参数：inFileType 要创建的音频文件的类型。查看 AudioFileTypeID 来了解可用的常量。
+         第三个参数：inFormat 一个指向描述了数据制式的结构体的指针。
+         第四个参数：inFlags 创建或打开文件相关的标记。如果 kAudioFileFlags_EraseFile 被设置，它抹除一个已存的文件。
+         如果此标记未被设置，且 URL 是一个已存的文件时，此函数就会失败。
+         第五个参数：outAudioFile 在输出时，是一个指向新创建的或初始化了的文件的指针。
+         */
         OSStatus status = AudioFileCreateWithURL(url, kAudioFileCAFType, &mRecordFormat, kAudioFileFlags_EraseFile, &mRecordFile);
         CFRelease(url);
         
@@ -249,13 +318,62 @@ void AQRecorder::StartRecord(CFStringRef inRecordFile)
         
         // copy the cookie first to give the file object as much info as we can about the data going in
         // not necessary for pcm, but required for some compressed audio
+        // 首先拷贝曲奇来给文件对象尽可能多的关于要进来的数据的信息
+        // PCM 数据不需要（not necessary），但一些压缩的音频是必需的（required）
         CopyEncoderCookieToFile();
         
         // allocate and enqueue buffers
+        // 分配并入队缓冲区
         bufferByteSize = ComputeRecordBufferSize(&mRecordFormat, kBufferDurationSeconds);	// enough bytes for half a second
         for (i = 0; i < kNumberRecordBuffers; ++i) {
             XThrowIfError(AudioQueueAllocateBuffer(mQueue, bufferByteSize, &mBuffers[i]),
                           "AudioQueueAllocateBuffer failed");
+            /*
+             Summary
+             
+             Adds a buffer to the buffer queue of a recording or playback audio queue.
+             添加一个缓冲区到一个录制或播放音频队列的缓冲队列中。
+             
+             Declaration
+             
+             OSStatus AudioQueueEnqueueBuffer(AudioQueueRef inAQ, AudioQueueBufferRef inBuffer, UInt32 inNumPacketDescs, const AudioStreamPacketDescription *inPacketDescs);
+             Discussion
+             
+             Audio queue callbacks use this function to reenqueue buffers—placing them “last in line” in a buffer queue. A playback (or output) callback reenqueues a buffer after the buffer is filled with fresh audio data (typically from a file). A recording (or input) callback reenqueues a buffer after the buffer’s contents were written (typically to a file).
+             音频队列回调使用此函数来重新入队缓冲区们——把它们以“队中的最后一个”的方式放入一个缓冲队列中。一个播放（或输出）回调重新入队一个缓冲区在这个缓冲区被填入新鲜的（refresh）音频数据（通常（typically）来自一个文件）之后。一个录制（或输入）回调重新入队一个缓冲区在这个缓冲区的内容被写入（通常写到一个文件中）之后。
+             Parameters
+             
+             inAQ
+             The audio queue that owns the audio queue buffer.
+             拥有音频队列缓冲的音频队列。
+             inBuffer
+             The audio queue buffer to add to the buffer queue.
+             要添加到缓冲队列中的音频队列缓冲区。
+             inNumPacketDescs
+             The number of packets of audio data in the inBuffer parameter. Use a value of 0 for any of the following situations:
+             When playing a constant bit rate (CBR) format.
+             When the audio queue is a recording (input) audio queue.
+             When the buffer you are reenqueuing was allocated with the AudioQueueAllocateBufferWithPacketDescriptions function. In this case, your callback should describe the buffer’s packets in the buffer’s mPacketDescriptions and mPacketDescriptionCount fields.
+             在 inBuffer 参数中的音频数据包的数量。有下列情形之一的，使用 0 值：
+             当播放一个恒定比特率（CBR）制式时。
+             当音频队列是一个录制（输入）音频队列时。
+             当你正添加的缓冲区是由 AudioQueueAllocateBufferWithPacketsDescriptions 函数分配的时。
+             在这种情况下，你的回调应该描述缓冲区的包们，在缓冲区的 mPacketDescriptions 和 mPacketDescriptionCount 字段中。
+             inPacketDescs
+             An array of packet descriptions. Use a value of NULL for any of the following situations:
+             When playing a constant bit rate (CBR) format.
+             When the audio queue is an input (recording) audio queue.
+             When the buffer you are reenqueuing was allocated with the AudioQueueAllocateBufferWithPacketDescriptions function. In this case, your callback should describe the buffer’s packets in the buffer’s mPacketDescriptions and mPacketDescriptionCount fields.
+             包描述的一个数组。有下列情形之一的，使用一个 NULL 值：
+             当播放一个恒定比特率（CBR）制式时。
+             当音频队列是一个输入（录制）音频队列时。
+             当你正重新入队的缓冲区是由 AudioQueueAllocateBufferWithPacketDescriptions 函数分配的时。
+             在这种情况下，你的回调应当描述缓冲区的包们，在缓冲区的 mPacketDescriptions 和 mPacketDescriptionCount 字段中。
+             Returns
+             
+             A result code. See Result Codes.
+             一个结果码。见 Result Codes。
+             */
             XThrowIfError(AudioQueueEnqueueBuffer(mQueue, mBuffers[i], 0, NULL),
                           "AudioQueueEnqueueBuffer failed");
         }

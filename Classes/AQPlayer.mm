@@ -343,7 +343,7 @@ void AQPlayer::SetupNewQueue()
     // 释义
     // 值为一个指向一块内存的可读写的空指针，是你建立（set up）的，包含了一个音频制式魔法曲奇。
     // 如果你正在播放或录制的音频制式要求（require）一个魔法曲奇的话，
-    // 在入列（enqueue）任何缓冲数据之前，你必须为此属性设定一个值。
+    // 在入列（enqueue）任何缓冲区之前，你必须为此属性设定一个值。
     
     
     // 魔法曲奇的其他介绍
@@ -393,8 +393,8 @@ void AQPlayer::SetupNewQueue()
          a channel layout to indicate channel order, such as left, then center, then right.
          
          值为一个可读写的 AudioChannelLayout 结构体，描述了一个音频队列（Audio Queue）的声道布局。在布局中的声道数量必须匹配在
-         音频制式中的声道数量。这个属性通常（typically）不会用在只有一个或两个声道的音频中。对于多于两个声道的音频，你可能需要指定
-         一个声道布局来标示声道的序列，如左，然后中，然后右。
+         音频制式中的声道数量。这个属性通常（typically）不会用在只有一个或两个声道的音频中。对于多于两个声道（如 5.1 环绕声
+         这种情形）的音频，你可能需要指定一个声道布局来标示声道的序列，如左，然后中，然后右。
          */
         
         result = AudioQueueSetProperty(mQueue, kAudioQueueProperty_ChannelLayout, acl, size);
@@ -442,9 +442,37 @@ void AQPlayer::SetupNewQueue()
     for (int i = 0; i < kNumberBuffers; ++i) {
         
         /**
+         Summary
          Asks an audio queue object to allocate an audio queue buffer with space for packet descriptions.
+         请求一个音频队列对象分配一个音频队列缓冲——有空间为包描述。
+         
+         Declaration
+         OSStatus AudioQueueAllocateBufferWithPacketDescriptions(AudioQueueRef inAQ, UInt32 inBufferByteSize, UInt32 inNumberPacketDescriptions, AudioQueueBufferRef  _Nullable *outBuffer);
+         
+         Discussion
          Use this function when allocating an audio queue buffer for use with a VBR compressed data format.
          Once allocated, the pointer to the audio queue buffer and the buffer’s capacity cannot be changed. The buffer’s size field, mAudioDataByteSize, which indicates the amount of valid data, is initially set to 0.
+         当分配一个音频队列缓冲区以给一个 VBR 压缩数据制式使用时，使用此函数。
+         一旦分配过之后，指向音频队列缓冲区的指针以及缓冲区的容量就不可再改变。缓冲区的 size 字段，mAudioDataByteSize ，
+         它标示了有效的数据的量，被初始设置为 0。
+         
+         Parameters
+         inAQ
+         The audio queue you want to allocate a buffer.
+         你想要分配一个缓冲的音频队列。
+         inBufferByteSize
+         The desired data capacity of the new buffer, in bytes. Appropriate capacity depends on the processing you will perform on the data as well as on the audio data format.
+         想要的新缓冲的数据容量，以字节计。合适的容量依赖于你想要执行在数据上的进程，也依赖于音频数据制式。
+         inNumberPacketDescriptions
+         The desired size of the packet description array in the new audio queue buffer.
+         在新的音频队列缓冲区中的，想要的包描述数组的大小。
+         outBuffer
+         On output, points to the newly allocated audio queue buffer.
+         在输出时，指向新分配的音频队列缓冲区。
+         
+         Returns
+         A result code. See Result Codes.
+         结果码。见 Result Codes。
          
          */
         /**
