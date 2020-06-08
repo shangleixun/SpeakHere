@@ -93,7 +93,7 @@ int AQRecorder::ComputeRecordBufferSize(const AudioStreamBasicDescription *forma
          AudioSampleType samples, calculate the value for this field as follows:
          mBytesPerFrame = sizeof (AudioSampleType);
          
-         对一个包含着 n 个声道的交叉存取的（interleaved）数据的音频缓冲，兼之每个采样的类型
+         对一个包含着 n 个声道的交叉存取的（interleaved）数据的音频缓冲，兼带着每个采样的类型
          是 AudioSampleType ，计算此字段的值如下：
          mBytesPerFrame = n * sizeof(AudioSampleType);
          对一个包含着非交叉存取的（noninterleaved）（单声道的）数据的音频缓冲，亦使用 AudioSampleType 的
@@ -131,7 +131,11 @@ int AQRecorder::ComputeRecordBufferSize(const AudioStreamBasicDescription *forma
                  （内在原理推测：此函数应该是专门用于录制音频的。最大输出包体积。有一个重要的依赖项是制式，比如 AAC，
                  最大码率是 320 kbps，倒推一下，320 kbps == 320000 bit/s == 320000/8 byte/s == 40000/1024 KiB/s
                  == 39.0625 KiB/s。半秒则为 19.53125 KiB。mp3 的最大码率 AAC 差不多，所以一样的。其他的依此类推可得。
-                 数据包的数量，AAC 是 1024/s，MP3 是 1152/s，所以用 40000/1024 == 39.0625 bytes，40000/1152 == 34.7222 bytes.）
+                 数据包的数量，AAC 是 1024 sample/s，MP3 是 1152 sample/s。这里的数据包，其实就是实际上的音频帧。
+                 对于 AAC：mBytesPerPacket == mBytesPerRealFrame == 40000/(mSampleRate/1024) == 928.798 bytesPerPacket
+                 对于 mp3：mBytesPerPacket == mBytesPerRealFrame == 40000/(44100/1152) == 1044.898 bytesPerPacket
+                 
+                 ）
                  
                  Declaration
                  kAudioQueueProperty_MaximumOutputPacketSize = 'xops'
@@ -180,7 +184,7 @@ void AQRecorder::MyInputBufferHandler(	void *								inUserData,
              UInt32 inNumBytes, const AudioStreamPacketDescription *inPacketDescriptions,
              SInt64 inStartingPacket, UInt32 *ioNumPackets, const void *inBuffer);
              Discussion
-             对所有非压缩音频制式，此函数将数据包数和帧包数视作等同。
+             对所有非压缩音频制式，此函数将数据包数和帧数视作等同。
              Parameters
              
              inAudioFile
@@ -479,12 +483,21 @@ void AQRecorder::StopRecord()
     mIsRunning = false;
     XThrowIfError(AudioQueueStop(mQueue, true), "AudioQueueStop failed");
     // a codec may update its cookie at the end of an encoding session, so reapply it to the file now
+    // 一个编码器可能会更新它的曲奇在编码任务（encoding session）的结尾，所以现在再把它应用到文件上
     CopyEncoderCookieToFile();
     if (mFileName)
     {
         CFRelease(mFileName);
         mFileName = NULL;
     }
+    /*
+     inImmediate
+     If you pass true, the audio queue is disposed of immediately (that is, synchronously).
+     If you pass false, disposal does not take place until all enqueued buffers are processed
+     (that is, asynchronously).
+     传 true，则立即销毁音频队列（同步操作）；
+     传 false，直到所有入队的缓冲区都被处理之后，销毁才会发生（异步操作）。
+     */
     AudioQueueDispose(mQueue, true);
     AudioFileClose(mRecordFile);
 }
