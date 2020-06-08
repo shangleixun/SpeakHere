@@ -130,7 +130,8 @@ int AQRecorder::ComputeRecordBufferSize(const AudioStreamBasicDescription *forma
                  压缩数据时主要有用（primarily useful）。
                  （内在原理推测：此函数应该是专门用于录制音频的。最大输出包体积。有一个重要的依赖项是制式，比如 AAC，
                  最大码率是 320 kbps，倒推一下，320 kbps == 320000 bit/s == 320000/8 byte/s == 40000/1024 KiB/s
-                 == 39.0625 KiB/s。半秒则为 19.53125 KiB。mp3 的最大码率 AAC 差不多，所以一样的。其他的依此类推可得。）
+                 == 39.0625 KiB/s。半秒则为 19.53125 KiB。mp3 的最大码率 AAC 差不多，所以一样的。其他的依此类推可得。
+                 数据包的数量，AAC 是 1024/s，MP3 是 1152/s，所以用 40000/1024 == 39.0625 bytes，40000/1152 == 34.7222 bytes.）
                  
                  Declaration
                  kAudioQueueProperty_MaximumOutputPacketSize = 'xops'
