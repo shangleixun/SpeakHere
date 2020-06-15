@@ -131,7 +131,7 @@ int AQRecorder::ComputeRecordBufferSize(const AudioStreamBasicDescription *forma
                  （内在原理推测：此函数应该是专门用于录制音频的。最大输出包体积。有一个重要的依赖项是制式，比如 AAC，
                  最大码率是 320 kbps，倒推一下，320 kbps == 320000 bit/s == 320000/8 byte/s == 40000/1024 KiB/s
                  == 39.0625 KiB/s。半秒则为 19.53125 KiB。mp3 的最大码率 AAC 差不多，所以一样的。其他的依此类推可得。
-                 数据包的数量，AAC 是 1024 sample/s，MP3 是 1152 sample/s。这里的数据包，其实就是实际上的音频帧。
+                 数据包中采样的数量，AAC 是 1024 sample/s，MP3 是 1152 sample/s。这里的数据包，其实就是实际上的音频帧。
                  对于 AAC：mBytesPerPacket == mBytesPerRealFrame == 40000/(mSampleRate/1024) == 928.798 bytesPerPacket
                  对于 mp3：mBytesPerPacket == mBytesPerRealFrame == 40000/(44100/1152) == 1044.898 bytesPerPacket
                  
@@ -195,7 +195,7 @@ void AQRecorder::MyInputBufferHandler(	void *								inUserData,
              正写入的音频数据的字节数量。
              inPacketDescriptions
              一个指向数据包描述的数组的指针——针对音频数据的。并不是所有制式都必需数据包描述。
-             如果没有数据包描述是必需的，例如，如果你在写一个 CBR 数据，传 NULL.
+             如果没有数据包描述是必需的，例如，假如你在写一个 CBR 数据，传 NULL.
              inStartingPacket
              替换第一个提供的数据包的数据包索引。
              ioNumPackets
@@ -481,6 +481,43 @@ void AQRecorder::StopRecord()
 {
     // end recording
     mIsRunning = false;
+    /*
+     Summary
+     
+     Stops playing or recording audio.
+     停止播放或录制音频。
+     Declaration
+     
+     OSStatus AudioQueueStop(AudioQueueRef inAQ, Boolean inImmediate);
+     Discussion
+     
+     This function resets an audio queue, stops the audio hardware associated
+     with the queue if it is not in use by other audio services, and stops the
+     audio queue. When recording, this function is typically invoked by a user.
+     When playing back, a playback audio queue callback should call this function
+     when there is no more audio to play.
+     此函数重置一个音频队列，停止同队列关联的音频硬件如果它没有被其他音频服务使用的话，且停止
+     音频队列。当录制音频时，此函数通常由一个用户调用。当播放音频时，一个播放的音频队列的回调
+     应当调用此函数，当没有更多的音频数据要播放时。
+     
+     Parameters
+     
+     inAQ
+     The audio queue to stop.
+     inImmediate
+     If you pass true, stopping occurs immediately (that is, synchronously).
+     If you pass false, the function returns immediately, but the audio
+     queue does not stop until its queued buffers are played or recorded
+     (that is, the stop occurs asynchronously). Audio queue callbacks are
+     invoked as necessary until the queue actually stops.
+     如果你传 true，停止立即发生（即同步地）。如果你传 false，此函数立即返回，但是音频
+     队列并不会停止，直到它的排了队的缓冲区已播放完或已录制结束（即，停止是异步发生的）。
+     音频队列的回调根据需要来调用，直到队列实际上停止。
+     
+     Returns
+     
+     A result code. See Result Codes.
+     */
     XThrowIfError(AudioQueueStop(mQueue, true), "AudioQueueStop failed");
     // a codec may update its cookie at the end of an encoding session, so reapply it to the file now
     // 一个编码器可能会更新它的曲奇在编码任务（encoding session）的结尾，所以现在再把它应用到文件上
